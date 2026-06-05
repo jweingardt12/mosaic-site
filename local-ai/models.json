@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "revision": "remote-2026-06-05",
+  "models": [
+    {
+      "id": "gemma-4-e2b-litert",
+      "displayName": "Gemma 4 E2B",
+      "runtime": "litert_lm",
+      "artifactURL": "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm?download=true",
+      "filename": "gemma-4-E2B-it.litertlm",
+      "byteSize": 2588147712,
+      "sha256": "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
+      "license": "Apache-2.0",
+      "huggingFaceRepo": "litert-community/gemma-4-E2B-it-litert-lm",
+      "huggingFaceRevision": "main",
+      "contextWindow": 4096,
+      "capabilities": ["news_tldr", "article_summary", "private_briefing"],
+      "minimumMemoryGB": 6
+    },
+    {
+      "id": "gemma-4-e4b-litert",
+      "displayName": "Gemma 4 E4B",
+      "runtime": "litert_lm",
+      "artifactURL": "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm?download=true",
+      "filename": "gemma-4-E4B-it.litertlm",
+      "byteSize": 3659530240,
+      "sha256": "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
+      "license": "Apache-2.0",
+      "huggingFaceRepo": "litert-community/gemma-4-E4B-it-litert-lm",
+      "huggingFaceRevision": "main",
+      "contextWindow": 4096,
+      "capabilities": ["news_tldr", "article_summary", "private_briefing"],
+      "minimumMemoryGB": 8
+    },
+    {
+      "id": "qwen3.5-4b-mlx-4bit",
+      "displayName": "Qwen3.5 4B",
+      "runtime": "mlx",
+      "artifactURL": "https://huggingface.co/mlx-community/Qwen3.5-4B-4bit/resolve/main/model.safetensors?download=true",
+      "filename": "model.safetensors",
+      "byteSize": 3030000000,
+      "sha256": "",
+      "license": "Apache-2.0",
+      "huggingFaceRepo": "mlx-community/Qwen3.5-4B-4bit",
+      "huggingFaceRevision": "0e7ffd5c629ef7719d4cbc04069232580bfa9d9c",
+      "contextWindow": 32768,
+      "capabilities": ["news_tldr", "article_summary", "private_briefing"],
+      "minimumMemoryGB": 8,
+      "files": [
+        {"path": "chat_template.jinja", "url": "https://huggingface.co/mlx-community/Qwen3.5-4B-4bit/resolve/0e7ffd5c629ef7719d4cbc04069232580bfa9d9c/chat_template.jinja?download=true", "byteSize": 100000},
+        {"path": "config.json", "url": "https://huggingface.co/mlx-community/Qwen3.5-4B-4bit/resolve/0e7ffd5c629ef7719d4cbc04069232580bfa9d9c/config.json?download=true", "byteSize": 100000},
+        {"path": "model.safetensors", "url": "https://huggingface.co/mlx-community/Qwen3.5-4B-4bit/resolve/0e7ffd5c629ef7719d4cbc04069232580bfa9d9c/model.safetensors?download=true", "byteSize": 3029200000},
+        {"path": "model.safetensors.index.json", "url": "https://huggingface.co/mlx-community/Qwen3.5-4B-4bit/resolve/0e7ffd5c629ef7719d4cbc04069232580bfa9d9c/model.safetensors.index.json?download=true", "byteSize": 100000},
+        {"path": "preprocessor_config.json", "url": "https://huggingface.co/mlx-community/Qwen3.5-4B-4bit/resolve/0e7ffd5c629ef7719d4cbc04069232580bfa9d9c/preprocessor_config.json?download=true", "byteSize": 100000},
+        {"path": "processor_config.json", "url": "https://huggingface.co/mlx-community/Qwen3.5-4B-4bit/resolve/0e7ffd5c629ef7719d4cbc04069232580bfa9d9c/processor_config.json?download=true", "byteSize": 100000},
+        {"path": "tokenizer.json", "url": "https://huggingface.co/mlx-community/Qwen3.5-4B-4bit/resolve/0e7ffd5c629ef7719d4cbc04069232580bfa9d9c/tokenizer.json?download=true", "byteSize": 100000},
+        {"path": "tokenizer_config.json", "url": "https://huggingface.co/mlx-community/Qwen3.5-4B-4bit/resolve/0e7ffd5c629ef7719d4cbc04069232580bfa9d9c/tokenizer_config.json?download=true", "byteSize": 100000},
+        {"path": "vocab.json", "url": "https://huggingface.co/mlx-community/Qwen3.5-4B-4bit/resolve/0e7ffd5c629ef7719d4cbc04069232580bfa9d9c/vocab.json?download=true", "byteSize": 100000}
+      ]
+    },
+    {
+      "id": "phi-4-mini-mlx-4bit",
+      "displayName": "Phi-4-mini",
+      "runtime": "mlx",
+      "artifactURL": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit/resolve/main/model.safetensors?download=true",
+      "filename": "model.safetensors",
+      "byteSize": 2160000000,
+      "sha256": "",
+      "license": "MIT",
+      "huggingFaceRepo": "mlx-community/Phi-4-mini-instruct-4bit",
+      "huggingFaceRevision": "ac1c269cb4222a4e136a3d09edad301056c1f36a",
+      "contextWindow": 8192,
+      "capabilities": ["news_tldr", "article_summary", "private_briefing"],
+      "minimumMemoryGB": 6,
+      "files": [
+        {"path": "added_tokens.json", "url": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit/resolve/ac1c269cb4222a4e136a3d09edad301056c1f36a/added_tokens.json?download=true", "byteSize": 100000},
+        {"path": "config.json", "url": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit/resolve/ac1c269cb4222a4e136a3d09edad301056c1f36a/config.json?download=true", "byteSize": 100000},
+        {"path": "merges.txt", "url": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit/resolve/ac1c269cb4222a4e136a3d09edad301056c1f36a/merges.txt?download=true", "byteSize": 100000},
+        {"path": "model.safetensors", "url": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit/resolve/ac1c269cb4222a4e136a3d09edad301056c1f36a/model.safetensors?download=true", "byteSize": 2159200000},
+        {"path": "model.safetensors.index.json", "url": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit/resolve/ac1c269cb4222a4e136a3d09edad301056c1f36a/model.safetensors.index.json?download=true", "byteSize": 100000},
+        {"path": "special_tokens_map.json", "url": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit/resolve/ac1c269cb4222a4e136a3d09edad301056c1f36a/special_tokens_map.json?download=true", "byteSize": 100000},
+        {"path": "tokenizer.json", "url": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit/resolve/ac1c269cb4222a4e136a3d09edad301056c1f36a/tokenizer.json?download=true", "byteSize": 100000},
+        {"path": "tokenizer_config.json", "url": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit/resolve/ac1c269cb4222a4e136a3d09edad301056c1f36a/tokenizer_config.json?download=true", "byteSize": 100000},
+        {"path": "vocab.json", "url": "https://huggingface.co/mlx-community/Phi-4-mini-instruct-4bit/resolve/ac1c269cb4222a4e136a3d09edad301056c1f36a/vocab.json?download=true", "byteSize": 100000}
+      ]
+    }
+  ]
+}
