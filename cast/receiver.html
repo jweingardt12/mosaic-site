@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mosaic Multiview Receiver</title>
+    <link rel="stylesheet" href="./receiver.css">
+  </head>
+  <body>
+    <cast-media-player id="media-player"></cast-media-player>
+    <main id="multiview" class="receiver-shell" data-mode="idle" data-count="0">
+      <section class="idle-state" aria-live="polite">
+        <div class="brand">Mosaic</div>
+        <div class="status">Ready for multiview</div>
+      </section>
+      <section id="slot-grid" class="slot-grid" aria-label="Mosaic multiview"></section>
+    </main>
+    <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js"></script>
+    <script src="./receiver.js"></script>
+  </body>
+</html>
