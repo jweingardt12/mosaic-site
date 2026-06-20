@@ -72,14 +72,11 @@
     const title = document.createElement("div");
     title.className = "slot-title";
 
-    const subtitle = document.createElement("div");
-    subtitle.className = "slot-subtitle";
-
     const error = document.createElement("div");
     error.className = "slot-error";
     error.textContent = "Unable to play this stream";
 
-    titleWrap.append(title, subtitle);
+    titleWrap.append(title);
     chrome.append(titleWrap);
     element.append(video, chrome, error);
     grid.append(element);
@@ -89,7 +86,6 @@
       element,
       video,
       title,
-      subtitle,
       error,
       hls: null,
       url: null,
@@ -136,7 +132,6 @@
   function updateRecord(record, slot, board) {
     const focused = slot.id === board.focusedSlotId;
     record.title.textContent = slot.title || "Live Feed";
-    record.subtitle.textContent = slot.subtitle || "";
     record.element.dataset.focused = focused ? "true" : "false";
     record.video.muted = !focused || board.focusedAudioMuted;
     record.video.volume = focused && !board.focusedAudioMuted ? 1 : 0;
