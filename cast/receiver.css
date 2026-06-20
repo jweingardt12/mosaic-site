@@ -61,55 +61,17 @@ cast-media-player {
 }
 
 .slot-grid {
-  width: 100vw;
-  height: 100vh;
+  position: absolute;
+  inset: clamp(10px, 1vw, 18px);
   display: none;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: clamp(8px, 0.9vw, 16px);
-  padding: clamp(10px, 1vw, 18px);
 }
 
 .receiver-shell[data-mode="multiview"] .slot-grid {
-  display: grid;
-}
-
-.receiver-shell[data-count="1"] .slot-grid {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-}
-
-.receiver-shell[data-count="2"] .slot-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: 1fr;
-}
-
-.receiver-shell[data-count="3"] .slot-grid {
-  grid-template-columns: 1.35fr 1fr;
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-}
-
-.receiver-shell[data-count="3"] .slot:first-child {
-  grid-row: span 2;
-}
-
-.receiver-shell[data-count="5"] .slot-grid,
-.receiver-shell[data-count="6"] .slot-grid,
-.receiver-shell[data-count="7"] .slot-grid,
-.receiver-shell[data-count="8"] .slot-grid,
-.receiver-shell[data-count="9"] .slot-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-}
-
-.receiver-shell[data-count="5"] .slot:first-child,
-.receiver-shell[data-count="6"] .slot:first-child {
-  grid-column: span 2;
-  grid-row: span 2;
+  display: block;
 }
 
 .slot {
-  position: relative;
+  position: absolute;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -117,6 +79,13 @@ cast-media-player {
   background: #000;
   border: 1px solid var(--line);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  transition:
+    left 180ms ease,
+    top 180ms ease,
+    width 180ms ease,
+    height 180ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .slot[data-focused="true"] {
