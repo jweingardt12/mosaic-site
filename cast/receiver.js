@@ -7,6 +7,13 @@
   const records = new Map();
   const LAYOUTS = new Set(["auto", "grid", "heroLeft", "heroTop", "quad"]);
   const GAP = 0.012;
+  const ATTACH_STAGGER_MS = 240;
+  const FOCUSED_MAX_HEIGHT = 720;
+  const FOCUSED_MAX_BITRATE = 4500000;
+  const SECONDARY_MAX_HEIGHT = 360;
+  const SECONDARY_MAX_BITRATE = 1400000;
+  const DENSE_SECONDARY_MAX_HEIGHT = 270;
+  const DENSE_SECONDARY_MAX_BITRATE = 900000;
   let currentSessionId = null;
   let latestSequence = 0;
 
@@ -171,6 +178,10 @@
   }
 
   function destroyRecord(record) {
+    if (record.attachTimer) {
+      window.clearTimeout(record.attachTimer);
+      record.attachTimer = null;
+    }
     if (record.hls) {
       record.hls.destroy();
       record.hls = null;
@@ -178,6 +189,8 @@
     record.video.pause();
     record.video.removeAttribute("src");
     record.video.load();
+    record.url = null;
+    record.policyKey = null;
   }
 
   function createRecord(slot) {
@@ -204,13 +217,123 @@
       error,
       hls: null,
       url: null,
+      attachTimer: null,
+      policyKey: null,
     };
   }
 
-  function attachStream(record, url) {
-    if (record.url === url) return;
+  function qualityPolicy(slot, board, frame, index, count) {
+    const focused = slot.id === board.focusedSlotId;
+    const dense = count >= 7;
+    const relaxed = count <= 2;
+    const maxHeight = focused
+      ? FOCUSED_MAX_HEIGHT
+      : dense
+        ? DENSE_SECONDARY_MAX_HEIGHT
+        : relaxed
+          ? 540
+          : SECONDARY_MAX_HEIGHT;
+    const maxBitrate = focused
+      ? FOCUSED_MAX_BITRATE
+      : dense
+        ? DENSE_SECONDARY_MAX_BITRATE
+        : relaxed
+          ? 2200000
+          : SECONDARY_MAX_BITRATE;
+    return {
+      focused,
+      maxHeight,
+      maxBitrate,
+      attachDelayMs: Math.max(0, index) * ATTACH_STAGGER_MS,
+      key: `${focused ? "focused" : "secondary"}:${maxHeight}:${maxBitrate}:${Math.round(frame.width * 100)}x${Math.round(frame.height * 100)}`,
+    };
+  }
+
+  function cappedLevelFor(hls, policy) {
+    const levels = Array.isArray(hls.levels) ? hls.levels : [];
+    if (!levels.length) return -1;
+
+    let best = -1;
+    for (let index = 0; index < levels.length; index += 1) {
+      const level = levels[index];
+      const height = Number(level.height || 0);
+      const bitrate = Number(level.bitrate || level.attrs?.BANDWIDTH || 0);
+      const heightOK = height <= 0 || height <= policy.maxHeight;
+      const bitrateOK = bitrate <= 0 || bitrate <= policy.maxBitrate;
+      if (heightOK && bitrateOK) best = index;
+    }
+    return best >= 0 ? best : 0;
+  }
+
+  function applyQualityPolicy(record, policy) {
+    record.policyKey = policy.key;
+    if (!record.hls) return;
+
+    const cap = cappedLevelFor(record.hls, policy);
+    if (cap < 0) return;
+    record.hls.autoLevelCapping = cap;
+    if (!policy.focused && record.hls.currentLevel > cap) {
+      record.hls.nextLevel = cap;
+    }
+  }
+
+  function playRecord(record) {
+    record.video.play().catch(() => {
+      record.element.dataset.error = "true";
+    });
+  }
+
+  function startStream(record, url, policy) {
+    if (record.url !== url) return;
+    record.element.dataset.error = "false";
+
+    if (record.video.canPlayType("application/vnd.apple.mpegurl")) {
+      record.video.src = url;
+      playRecord(record);
+    } else if (window.Hls && window.Hls.isSupported()) {
+      record.hls = new window.Hls({
+        liveSyncDurationCount: policy.focused ? 3 : 4,
+        maxLiveSyncPlaybackRate: policy.focused ? 1.5 : 1.25,
+        capLevelToPlayerSize: true,
+        startLevel: 0,
+        maxBufferLength: policy.focused ? 20 : 12,
+        backBufferLength: 0,
+        abrEwmaFastLive: 2,
+        abrEwmaSlowLive: 5,
+      });
+      record.hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        applyQualityPolicy(record, policy);
+        playRecord(record);
+      });
+      record.hls.on(window.Hls.Events.ERROR, (_event, data) => {
+        if (data && data.fatal) {
+          record.element.dataset.error = "true";
+          if (record.hls) record.hls.destroy();
+          record.hls = null;
+          record.url = null;
+        }
+      });
+      record.hls.loadSource(url);
+      record.hls.attachMedia(record.video);
+    } else {
+      record.video.src = url;
+      playRecord(record);
+    }
+  }
+
+  function attachStream(record, url, policy) {
+    if (record.url === url) {
+      if (record.policyKey !== policy.key) {
+        applyQualityPolicy(record, policy);
+      }
+      return;
+    }
     record.url = url;
     record.element.dataset.error = "false";
+    if (record.attachTimer) {
+      window.clearTimeout(record.attachTimer);
+      record.attachTimer = null;
+    }
     if (record.hls) {
       record.hls.destroy();
       record.hls = null;
@@ -218,38 +341,20 @@
     record.video.pause();
     record.video.removeAttribute("src");
     record.video.load();
+    record.policyKey = policy.key;
 
-    if (record.video.canPlayType("application/vnd.apple.mpegurl")) {
-      record.video.src = url;
-    } else if (window.Hls && window.Hls.isSupported()) {
-      record.hls = new window.Hls({
-        liveSyncDurationCount: 3,
-        maxLiveSyncPlaybackRate: 1.5,
-      });
-      record.hls.on(window.Hls.Events.ERROR, (_event, data) => {
-        if (data && data.fatal) {
-          record.element.dataset.error = "true";
-          if (record.hls) record.hls.destroy();
-          record.hls = null;
-        }
-      });
-      record.hls.loadSource(url);
-      record.hls.attachMedia(record.video);
-    } else {
-      record.video.src = url;
-    }
-
-    record.video.play().catch(() => {
-      record.element.dataset.error = "true";
-    });
+    record.attachTimer = window.setTimeout(() => {
+      record.attachTimer = null;
+      startStream(record, url, policy);
+    }, policy.attachDelayMs);
   }
 
-  function updateRecord(record, slot, board) {
+  function updateRecord(record, slot, board, frame, index, count) {
     const focused = slot.id === board.focusedSlotId;
     record.element.dataset.focused = focused ? "true" : "false";
     record.video.muted = !focused || board.focusedAudioMuted;
     record.video.volume = focused && !board.focusedAudioMuted ? 1 : 0;
-    attachStream(record, slot.hlsUrl);
+    attachStream(record, slot.hlsUrl, qualityPolicy(slot, board, frame, index, count));
   }
 
   function renderBoard(board) {
@@ -278,8 +383,8 @@
         record = createRecord(slot);
         records.set(slot.id, record);
       }
-      updateRecord(record, slot, board);
       applyFrame(record.element, frames[index]);
+      updateRecord(record, slot, board, frames[index], index, slots.length);
       grid.append(record.element);
     }
   }
