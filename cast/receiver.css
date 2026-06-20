@@ -103,10 +103,7 @@ cast-media-player {
 }
 
 .receiver-shell[data-count="5"] .slot:first-child,
-.receiver-shell[data-count="6"] .slot:first-child,
-.receiver-shell[data-count="7"] .slot:first-child,
-.receiver-shell[data-count="8"] .slot:first-child,
-.receiver-shell[data-count="9"] .slot:first-child {
+.receiver-shell[data-count="6"] .slot:first-child {
   grid-column: span 2;
   grid-row: span 2;
 }
@@ -135,31 +132,6 @@ cast-media-player {
   display: block;
   object-fit: contain;
   background: #000;
-}
-
-.slot-chrome {
-  position: absolute;
-  left: clamp(12px, 1vw, 18px);
-  right: clamp(12px, 1vw, 18px);
-  bottom: clamp(12px, 1vw, 18px);
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 18px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: linear-gradient(180deg, rgba(3, 4, 6, 0.1), var(--panel-strong));
-  pointer-events: none;
-}
-
-.slot-title {
-  min-width: 0;
-  font-size: clamp(20px, 1.75vw, 34px);
-  font-weight: 800;
-  letter-spacing: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .slot-error {
