@@ -7,13 +7,17 @@
   const records = new Map();
   const LAYOUTS = new Set(["auto", "grid", "heroLeft", "heroTop", "quad"]);
   const GAP = 0.012;
-  const ATTACH_STAGGER_MS = 240;
+  const ATTACH_STAGGER_MS = 900;
   const FOCUSED_MAX_HEIGHT = 720;
-  const FOCUSED_MAX_BITRATE = 4500000;
+  const FOCUSED_MAX_BITRATE = 3600000;
+  const FOUR_UP_FOCUSED_MAX_HEIGHT = 360;
+  const FOUR_UP_FOCUSED_MAX_BITRATE = 1400000;
   const SECONDARY_MAX_HEIGHT = 360;
-  const SECONDARY_MAX_BITRATE = 1400000;
-  const DENSE_SECONDARY_MAX_HEIGHT = 270;
-  const DENSE_SECONDARY_MAX_BITRATE = 900000;
+  const SECONDARY_MAX_BITRATE = 1000000;
+  const FOUR_UP_SECONDARY_MAX_HEIGHT = 234;
+  const FOUR_UP_SECONDARY_MAX_BITRATE = 500000;
+  const DENSE_SECONDARY_MAX_HEIGHT = 234;
+  const DENSE_SECONDARY_MAX_BITRATE = 420000;
   let currentSessionId = null;
   let latestSequence = 0;
 
@@ -200,8 +204,10 @@
 
     const video = document.createElement("video");
     video.autoplay = true;
+    video.preload = "none";
     video.playsInline = true;
     video.controls = false;
+    video.disablePictureInPicture = true;
 
     const error = document.createElement("div");
     error.className = "slot-error";
@@ -225,18 +231,27 @@
   function qualityPolicy(slot, board, frame, index, count) {
     const focused = slot.id === board.focusedSlotId;
     const dense = count >= 7;
+    const fourUp = count >= 4;
     const relaxed = count <= 2;
     const maxHeight = focused
-      ? FOCUSED_MAX_HEIGHT
+      ? fourUp
+        ? FOUR_UP_FOCUSED_MAX_HEIGHT
+        : FOCUSED_MAX_HEIGHT
       : dense
         ? DENSE_SECONDARY_MAX_HEIGHT
+        : fourUp
+          ? FOUR_UP_SECONDARY_MAX_HEIGHT
         : relaxed
           ? 540
           : SECONDARY_MAX_HEIGHT;
     const maxBitrate = focused
-      ? FOCUSED_MAX_BITRATE
+      ? fourUp
+        ? FOUR_UP_FOCUSED_MAX_BITRATE
+        : FOCUSED_MAX_BITRATE
       : dense
         ? DENSE_SECONDARY_MAX_BITRATE
+        : fourUp
+          ? FOUR_UP_SECONDARY_MAX_BITRATE
         : relaxed
           ? 2200000
           : SECONDARY_MAX_BITRATE;
@@ -272,8 +287,11 @@
     const cap = cappedLevelFor(record.hls, policy);
     if (cap < 0) return;
     record.hls.autoLevelCapping = cap;
-    if (!policy.focused && record.hls.currentLevel > cap) {
+    if (record.hls.currentLevel > cap) {
       record.hls.nextLevel = cap;
+    }
+    if (record.hls.loadLevel > cap) {
+      record.hls.loadLevel = cap;
     }
   }
 
@@ -292,11 +310,15 @@
       playRecord(record);
     } else if (window.Hls && window.Hls.isSupported()) {
       record.hls = new window.Hls({
-        liveSyncDurationCount: policy.focused ? 3 : 4,
-        maxLiveSyncPlaybackRate: policy.focused ? 1.5 : 1.25,
+        liveSyncDurationCount: policy.focused ? 5 : 6,
+        maxLiveSyncPlaybackRate: 1,
         capLevelToPlayerSize: true,
+        lowLatencyMode: false,
+        enableWorker: true,
         startLevel: 0,
-        maxBufferLength: policy.focused ? 20 : 12,
+        maxBufferLength: policy.focused ? 12 : 7,
+        maxMaxBufferLength: policy.focused ? 16 : 10,
+        maxBufferSize: policy.focused ? 14000000 : 7000000,
         backBufferLength: 0,
         abrEwmaFastLive: 2,
         abrEwmaSlowLive: 5,
