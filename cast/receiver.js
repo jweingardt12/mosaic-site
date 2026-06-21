@@ -501,7 +501,17 @@
 
   function hlsErrorDetail(data) {
     if (!data) return "unknown";
-    return data.details || data.type || "fatal";
+    const base = data.details || data.type || "fatal";
+    // Diagnostic: include the failed fetch's HTTP status + host so the sender can
+    // tell CORS (status 0/none — browser blocked the cross-origin response) from
+    // a real HTTP error like 403 (auth/geo). hls.js sets data.response for
+    // network errors; networkDetails is the raw XHR.
+    let status = null;
+    if (data.response && data.response.code != null) status = data.response.code;
+    else if (data.networkDetails && typeof data.networkDetails.status === "number") status = data.networkDetails.status;
+    const url = (data.context && data.context.url) || data.url || (data.frag && data.frag.url) || "";
+    const host = url ? (url.split("/")[2] || "") : "";
+    return base + " http=" + (status == null ? "none" : status) + (host ? " host=" + host : "");
   }
 
   function handleFatalHlsError(record, url, policy, data) {
