@@ -112,6 +112,15 @@ body[data-mode="single"] .receiver-shell {
     inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
+/* A lone tile (single-game cast) is always "focused", so the green focus
+   ring/glow is meaningless — drop it back to the neutral tile border. The
+   focus accent only earns its keep when there are multiple tiles (it marks
+   the one with audio). */
+.receiver-shell[data-count="1"] .slot[data-focused="true"] {
+  border-color: var(--line);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
 .slot video {
   width: 100%;
   height: 100%;

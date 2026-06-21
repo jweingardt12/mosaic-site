@@ -285,16 +285,7 @@
     error.className = "slot-error";
     error.textContent = "Unable to play this stream";
 
-    // TEMP diagnostic readout: shows the native player's seekable range,
-    // duration, and current position so we can see why a tile starts behind
-    // live on-device. Remove once live-edge join is confirmed.
-    const debug = document.createElement("div");
-    debug.className = "slot-debug";
-    debug.style.cssText =
-      "position:absolute;top:4px;left:6px;z-index:9;font:10px/1.3 ui-monospace,monospace;" +
-      "color:#5f5;background:rgba(0,0,0,.55);padding:1px 5px;border-radius:3px;pointer-events:none;";
-
-    element.append(video, error, debug);
+    element.append(video, error);
     grid.append(element);
 
     const record = {
@@ -302,7 +293,6 @@
       element,
       video,
       error,
-      debug,
       hls: null,
       url: null,
       attachTimer: null,
@@ -414,23 +404,12 @@
     return { start, end };
   }
 
-  function updateDebug(record, range) {
-    if (!record.debug) return;
-    const v = record.video;
-    const dur = Number.isFinite(v.duration) ? v.duration.toFixed(0) : String(v.duration);
-    record.debug.textContent = range
-      ? "sk:" + range.start.toFixed(0) + "-" + range.end.toFixed(0) +
-        " d:" + dur + " c:" + v.currentTime.toFixed(0)
-      : "sk:none d:" + dur + " c:" + v.currentTime.toFixed(0);
-  }
-
   // Pull a tile up to the live edge and keep it there. The old one-shot
   // approach gave up after the first valid seekable range, but on the native
   // Cast player `seekable.end` only reaches the true live point a few seconds
   // after playback starts (and an early currentTime set can be ignored). So we
   // poll: while within the enforce window, whenever a tile is more than
-  // MAX_DRIFT behind the playlist end, jump it to (end - OFFSET). The interval
-  // also drives the on-tile debug readout for the life of the tile.
+  // MAX_DRIFT behind the playlist end, jump it to (end - OFFSET).
   function startLiveEdgePin(record) {
     stopLiveEdgePin(record);
     const url = record.url;
@@ -441,7 +420,6 @@
         return;
       }
       const range = liveEdgeRange(record);
-      updateDebug(record, range);
       if (range && Date.now() - startedAt <= LIVE_EDGE_PIN_DURATION_MS) {
         if (range.end - record.video.currentTime > LIVE_EDGE_MAX_DRIFT_SECONDS) {
           record.video.currentTime = Math.max(range.start, range.end - LIVE_EDGE_OFFSET_SECONDS);
