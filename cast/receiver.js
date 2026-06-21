@@ -234,10 +234,33 @@
   }
 
   function applyFrame(element, frame) {
-    element.style.left = `${frame.x * 100}%`;
-    element.style.top = `${frame.y * 100}%`;
-    element.style.width = `${frame.width * 100}%`;
-    element.style.height = `${frame.height * 100}%`;
+    let { x, y, width, height } = frame;
+    // Fit the tile to the video's 16:9 aspect within its cell so the (yellow)
+    // border hugs the video instead of the letterbox bars — object-fit:contain
+    // otherwise leaves black inside the border on non-16:9 cells (e.g. 2-up).
+    // The video doesn't shrink (it was already letterboxed to 16:9); only the
+    // tile/border moves inward to meet it.
+    const grid = element.parentElement;
+    const gw = grid ? grid.clientWidth : 0;
+    const gh = grid ? grid.clientHeight : 0;
+    if (gw > 0 && gh > 0) {
+      const cellW = width * gw;
+      const cellH = height * gh;
+      let fitW = cellW;
+      let fitH = (cellW * 9) / 16;
+      if (fitH > cellH) {
+        fitH = cellH;
+        fitW = (cellH * 16) / 9;
+      }
+      x += (width - fitW / gw) / 2;
+      y += (height - fitH / gh) / 2;
+      width = fitW / gw;
+      height = fitH / gh;
+    }
+    element.style.left = `${x * 100}%`;
+    element.style.top = `${y * 100}%`;
+    element.style.width = `${width * 100}%`;
+    element.style.height = `${height * 100}%`;
   }
 
   function destroyRecord(record) {

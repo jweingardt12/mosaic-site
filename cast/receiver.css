@@ -92,10 +92,10 @@ body[data-mode="single"] .receiver-shell {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #000;
-  border: 1px solid var(--line);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(255, 214, 10, 0.5);
+  box-shadow: none;
   transition:
     left 180ms ease,
     top 180ms ease,
@@ -105,20 +105,16 @@ body[data-mode="single"] .receiver-shell {
     box-shadow 140ms ease;
 }
 
+/* The focused (audio) tile gets a brighter, fully-opaque yellow border — no
+   outer glow, so the border stays tight to the video edge. */
 .slot[data-focused="true"] {
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 2px rgba(55, 214, 122, 0.22),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border-color: #ffd60a;
 }
 
-/* A lone tile (single-game cast) is always "focused", so the green focus
-   ring/glow is meaningless — drop it back to the neutral tile border. The
-   focus accent only earns its keep when there are multiple tiles (it marks
-   the one with audio). */
-.receiver-shell[data-count="1"] .slot[data-focused="true"] {
-  border-color: var(--line);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+/* A lone tile (single-game cast) is always "focused" and fills the screen, so
+   a border is just noise — drop it entirely. */
+.receiver-shell[data-count="1"] .slot {
+  border-color: transparent;
 }
 
 .slot video {
