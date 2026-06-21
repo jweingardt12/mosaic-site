@@ -358,12 +358,14 @@
 
     const cap = cappedLevelFor(record.hls, policy);
     if (cap < 0) return;
+    // Multiview tiles must NOT run ABR. With up to 4 concurrent decodes on a
+    // single-pipeline Cast / Android TV device, per-tile ABR probing churns the
+    // decoder (each level switch flushes + re-inits) and the tiles fight over
+    // bandwidth — both surface as stutter. Pin each tile to a fixed rendition at
+    // its role cap and hold it (no auto level switching).
     record.hls.autoLevelCapping = cap;
-    if (record.hls.currentLevel > cap) {
-      record.hls.nextLevel = cap;
-    }
-    if (record.hls.loadLevel > cap) {
-      record.hls.loadLevel = cap;
+    if (record.hls.currentLevel !== cap) {
+      record.hls.currentLevel = cap;
     }
   }
 
@@ -425,7 +427,12 @@
     // common path; the native src path is now only a fallback.
     if (window.Hls && window.Hls.isSupported()) {
       record.hls = new window.Hls({
-        liveSyncDurationCount: policy.focused ? 3 : 4,
+        // Sit further behind live and tolerate a tile drifting back, so a
+        // decode-bound tile coasts smoothly instead of hard-seeking to live
+        // (the seek is itself a visible stutter). Cast latency is invisible
+        // here — nothing syncs the receiver to a broadcast clock.
+        liveSyncDurationCount: policy.focused ? 4 : 6,
+        liveMaxLatencyDurationCount: policy.focused ? 12 : 15,
         maxLiveSyncPlaybackRate: 1,
         capLevelToPlayerSize: true,
         lowLatencyMode: false,
