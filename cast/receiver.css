@@ -27,6 +27,23 @@ body {
 
 cast-media-player {
   display: none;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+body[data-mode="single"] {
+  background: #000;
+}
+
+body[data-mode="single"] cast-media-player {
+  display: block;
+}
+
+body[data-mode="single"] .receiver-shell {
+  display: none;
 }
 
 .receiver-shell {

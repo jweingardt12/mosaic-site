@@ -20,6 +20,7 @@
   const DENSE_SECONDARY_MAX_BITRATE = 420000;
   let currentSessionId = null;
   let latestSequence = 0;
+  document.body.dataset.mode = "idle";
 
   function nowMessage(type, extra = {}) {
     return {
@@ -39,10 +40,9 @@
     return data;
   }
 
-  function setIdle() {
+  function resetMultiviewBoard() {
     currentSessionId = null;
     latestSequence = 0;
-    shell.dataset.mode = "idle";
     shell.dataset.count = "0";
     shell.dataset.layout = "auto";
     for (const record of records.values()) {
@@ -50,6 +50,18 @@
     }
     records.clear();
     grid.replaceChildren();
+  }
+
+  function setIdle() {
+    resetMultiviewBoard();
+    document.body.dataset.mode = "idle";
+    shell.dataset.mode = "idle";
+  }
+
+  function setSingleMediaMode() {
+    resetMultiviewBoard();
+    document.body.dataset.mode = "single";
+    shell.dataset.mode = "single";
   }
 
   function normalizeLayout(layout, count) {
@@ -61,6 +73,7 @@
 
   function setMultiviewMode(count, layout) {
     const clampedCount = Math.max(0, Math.min(9, count));
+    document.body.dataset.mode = "multiview";
     shell.dataset.mode = "multiview";
     shell.dataset.count = String(clampedCount);
     shell.dataset.layout = normalizeLayout(layout, clampedCount);
@@ -439,6 +452,11 @@
       }
 
       if (envelope.type === "loadBoard" || envelope.type === "updateBoard") {
+        try {
+          playerManager.stop();
+        } catch (_error) {
+          // No active CAF media session; multiview owns playback from here.
+        }
         renderBoard(envelope.board);
         send(senderId, nowMessage("ack", { sequence: envelope.sequence }));
         return;
@@ -454,7 +472,7 @@
   const playerManager = context.getPlayerManager();
 
   playerManager.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (request) => {
-    setIdle();
+    setSingleMediaMode();
     return request;
   });
 
