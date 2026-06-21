@@ -663,6 +663,32 @@
       updateRecord(record, slot, board, frames[index], index, slots.length);
       grid.append(record.element);
     }
+
+    // Single-game cast carries play/pause as a board-level flag (multiview
+    // always plays, so the field is absent → treated as playing).
+    applyPausedState(board.paused === true);
+  }
+
+  function applyPausedState(paused) {
+    for (const record of records.values()) {
+      if (!record.video) continue;
+      if (paused) {
+        record.video.pause();
+      } else if (record.video.paused) {
+        record.video.play().catch(() => {});
+      }
+    }
+  }
+
+  // "Jump to Live": seek a tile straight to the live edge now, then keep it
+  // pinned. Used by the single-game remote's Live button (seekLive message).
+  function jumpToLiveEdge(record) {
+    const range = liveEdgeRange(record);
+    if (range) {
+      record.video.currentTime = Math.max(range.start, range.end - LIVE_EDGE_OFFSET_SECONDS);
+    }
+    record.video.play().catch(() => {});
+    startLiveEdgePin(record);
   }
 
   // --- Playback-health monitor ------------------------------------------------
@@ -780,6 +806,14 @@
 
       if (envelope.type === "stopBoard") {
         setIdle();
+        send(senderId, nowMessage("ack", { sequence: envelope.sequence }));
+        return;
+      }
+
+      if (envelope.type === "seekLive") {
+        for (const record of records.values()) {
+          if (record.url) jumpToLiveEdge(record);
+        }
         send(senderId, nowMessage("ack", { sequence: envelope.sequence }));
         return;
       }
