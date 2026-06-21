@@ -5,7 +5,7 @@
   const shell = document.getElementById("multiview");
   const grid = document.getElementById("slot-grid");
   const records = new Map();
-  const LAYOUTS = new Set(["auto", "grid", "heroLeft", "heroTop", "quad", "sideBySide", "stacked", "spotlight"]);
+  const LAYOUTS = new Set(["auto", "grid", "heroLeft", "heroTop", "quad"]);
   const GAP = 0.012;
   const ATTACH_STAGGER_MS = 1200;
   const LIVE_EDGE_OFFSET_SECONDS = 3;
@@ -21,24 +21,8 @@
   const FOUR_UP_SECONDARY_MAX_BITRATE = 280000;
   const DENSE_SECONDARY_MAX_HEIGHT = 180;
   const DENSE_SECONDARY_MAX_BITRATE = 220000;
-  const MAX_TILES = 2;
-  const TILE_RETRY_LIMIT = 2;
-  const TILE_RETRY_BACKOFF_MS = [1000, 2000];
-
-  // --- Playback-health monitor tuning ---
-  // These thresholds are first-pass guesses and NEED real-device tuning on a
-  // physical Chromecast against live MLB streams (Chrome Remote Debugger →
-  // getVideoPlaybackQuality / waiting events). Treat them as starting points.
-  const HEALTH_SAMPLE_INTERVAL_MS = 4000;          // how often we sample tile health
-  const HEALTH_WINDOW_SAMPLES = 3;                 // rolling judgement window (~12s)
-  const HEALTH_DROPPED_FRAME_RATIO = 0.2;          // sum(droppedDelta)/sum(totalDelta) over window
-  const HEALTH_STALL_PER_TILE = 2;                 // stall budget per tile across the window
-  const HEALTH_DOWNGRADE_COOLDOWN_MS = 20000;      // min gap between downgrade recommendations
-
   let currentSessionId = null;
   let latestSequence = 0;
-  let lastSenderId = null;
-  const connectedSenders = new Set();
   document.body.dataset.mode = "idle";
 
   function nowMessage(type, extra = {}) {
@@ -69,8 +53,6 @@
     }
     records.clear();
     grid.replaceChildren();
-    healthWindow = [];
-    lastDowngradeAt = 0;
   }
 
   function setIdle() {
@@ -89,12 +71,11 @@
     const value = typeof layout === "string" && LAYOUTS.has(layout) ? layout : "auto";
     if (value === "quad" && count > 4) return "grid";
     if ((value === "heroLeft" || value === "heroTop") && count < 2) return "auto";
-    if ((value === "stacked" || value === "spotlight") && count < 2) return "sideBySide";
     return value;
   }
 
   function setMultiviewMode(count, layout) {
-    const clampedCount = Math.max(0, Math.min(MAX_TILES, count));
+    const clampedCount = Math.max(0, Math.min(9, count));
     document.body.dataset.mode = "multiview";
     shell.dataset.mode = "multiview";
     shell.dataset.count = String(clampedCount);
@@ -193,24 +174,7 @@
     return equalGridFrames(count, 3, 3);
   }
 
-  function spotlightFrames(count, focusedIndex) {
-    // 2-tile spotlight: the focused (audio) game fills the big left frame; the
-    // other is a smaller card on the right. Switching audio swaps them.
-    if (count <= 1) return [rect(0, 0, 1, 1)];
-    if (count !== 2) return equalGridFrames(count, 2, 1);
-    const bigWidth = 0.68;
-    const big = rect(0, 0, bigWidth, 1);
-    const smallWidth = 1 - bigWidth - GAP;
-    const smallHeight = 0.5;
-    const small = rect(bigWidth + GAP, (1 - smallHeight) / 2, smallWidth, smallHeight);
-    const focused = Math.max(0, Math.min(Number(focusedIndex) || 0, 1));
-    const frames = [];
-    frames[focused] = big;
-    frames[1 - focused] = small;
-    return frames;
-  }
-
-  function layoutFrames(layout, count, focusedIndex) {
+  function layoutFrames(layout, count) {
     switch (normalizeLayout(layout, count)) {
       case "grid":
         return gridFrames(count);
@@ -220,12 +184,6 @@
         return heroTopFrames(count);
       case "quad":
         return equalGridFrames(count, 2, 2);
-      case "sideBySide":
-        return count <= 1 ? [rect(0, 0, 1, 1)] : equalGridFrames(count, 2, 1);
-      case "stacked":
-        return count <= 1 ? [rect(0, 0, 1, 1)] : equalGridFrames(count, 1, 2);
-      case "spotlight":
-        return spotlightFrames(count, focusedIndex);
       case "auto":
       default:
         return autoFrames(count);
@@ -244,10 +202,6 @@
       window.clearTimeout(record.attachTimer);
       record.attachTimer = null;
     }
-    if (record.retryTimer) {
-      window.clearTimeout(record.retryTimer);
-      record.retryTimer = null;
-    }
     if (record.hls) {
       record.hls.destroy();
       record.hls = null;
@@ -262,10 +216,6 @@
     record.url = null;
     record.didJoinLiveEdge = false;
     record.policyKey = null;
-    record.retryCount = 0;
-    record.stallCount = 0;
-    record.prevDropped = 0;
-    record.prevTotal = 0;
   }
 
   function createRecord(slot) {
@@ -287,7 +237,7 @@
     element.append(video, error);
     grid.append(element);
 
-    const record = {
+    return {
       id: slot.id,
       element,
       video,
@@ -298,20 +248,7 @@
       liveEdgeTimer: null,
       didJoinLiveEdge: false,
       policyKey: null,
-      retryCount: 0,
-      retryTimer: null,
-      stallCount: 0,
-      prevDropped: 0,
-      prevTotal: 0,
     };
-
-    // Count stalls for the health monitor. A `waiting` event fires whenever the
-    // element runs out of buffered data and has to re-buffer.
-    video.addEventListener("waiting", () => {
-      record.stallCount += 1;
-    });
-
-    return record;
   }
 
   function qualityPolicy(slot, board, frame, index, count) {
@@ -319,7 +256,7 @@
     const dense = count >= 5;
     const fourUp = count >= 4;
     const relaxed = count <= 2;
-    const roleHeight = focused
+    const maxHeight = focused
       ? fourUp
         ? FOUR_UP_FOCUSED_MAX_HEIGHT
         : FOCUSED_MAX_HEIGHT
@@ -330,7 +267,7 @@
         : relaxed
           ? 540
           : SECONDARY_MAX_HEIGHT;
-    const roleBitrate = focused
+    const maxBitrate = focused
       ? fourUp
         ? FOUR_UP_FOCUSED_MAX_BITRATE
         : FOCUSED_MAX_BITRATE
@@ -341,22 +278,12 @@
         : relaxed
           ? 2200000
           : SECONDARY_MAX_BITRATE;
-
-    // Serialized per-tile hints from the sender clamp the role-based ceiling
-    // downward — they can only tighten the cap, never relax it.
-    const hintHeight = typeof slot.maxHeight === "number" && slot.maxHeight > 0 ? slot.maxHeight : 0;
-    const hintBitrate = typeof slot.maxBitrateKbps === "number" && slot.maxBitrateKbps > 0
-      ? slot.maxBitrateKbps * 1000
-      : 0;
-    const maxHeight = hintHeight ? Math.min(roleHeight, hintHeight) : roleHeight;
-    const maxBitrate = hintBitrate ? Math.min(roleBitrate, hintBitrate) : roleBitrate;
-
     return {
       focused,
       maxHeight,
       maxBitrate,
       attachDelayMs: Math.max(0, index) * ATTACH_STAGGER_MS,
-      key: `${focused ? "focused" : "secondary"}:${maxHeight}:${maxBitrate}:${hintHeight}:${hintBitrate}:${Math.round(frame.width * 100)}x${Math.round(frame.height * 100)}`,
+      key: `${focused ? "focused" : "secondary"}:${maxHeight}:${maxBitrate}:${Math.round(frame.width * 100)}x${Math.round(frame.height * 100)}`,
     };
   }
 
@@ -382,14 +309,12 @@
 
     const cap = cappedLevelFor(record.hls, policy);
     if (cap < 0) return;
-    // Multiview tiles must NOT run ABR. With up to 4 concurrent decodes on a
-    // single-pipeline Cast / Android TV device, per-tile ABR probing churns the
-    // decoder (each level switch flushes + re-inits) and the tiles fight over
-    // bandwidth — both surface as stutter. Pin each tile to a fixed rendition at
-    // its role cap and hold it (no auto level switching).
     record.hls.autoLevelCapping = cap;
-    if (record.hls.currentLevel !== cap) {
-      record.hls.currentLevel = cap;
+    if (record.hls.currentLevel > cap) {
+      record.hls.nextLevel = cap;
+    }
+    if (record.hls.loadLevel > cap) {
+      record.hls.loadLevel = cap;
     }
   }
 
@@ -445,18 +370,17 @@
     if (record.url !== url) return;
     record.element.dataset.error = "false";
 
-    // Force hls.js when supported so the per-tile quality cap (applyQualityPolicy)
-    // always binds — the native HLS path can't be capped, so it would leak full
-    // bitrate. Chromium-based Cast WebViews support hls.js, so this is the
-    // common path; the native src path is now only a fallback.
-    if (window.Hls && window.Hls.isSupported()) {
+    if (record.video.canPlayType("application/vnd.apple.mpegurl")) {
+      record.video.addEventListener(
+        "loadedmetadata",
+        () => scheduleLiveEdgeJoin(record),
+        { once: true }
+      );
+      record.video.src = url;
+      playRecord(record);
+    } else if (window.Hls && window.Hls.isSupported()) {
       record.hls = new window.Hls({
-        // Sit further behind live and tolerate a tile drifting back, so a
-        // decode-bound tile coasts smoothly instead of hard-seeking to live
-        // (the seek is itself a visible stutter). Cast latency is invisible
-        // here — nothing syncs the receiver to a broadcast clock.
-        liveSyncDurationCount: policy.focused ? 4 : 6,
-        liveMaxLatencyDurationCount: policy.focused ? 12 : 15,
+        liveSyncDurationCount: policy.focused ? 3 : 4,
         maxLiveSyncPlaybackRate: 1,
         capLevelToPlayerSize: true,
         lowLatencyMode: false,
@@ -480,73 +404,17 @@
       });
       record.hls.on(window.Hls.Events.ERROR, (_event, data) => {
         if (data && data.fatal) {
-          handleFatalHlsError(record, url, policy, data);
+          record.element.dataset.error = "true";
+          if (record.hls) record.hls.destroy();
+          record.hls = null;
+          record.url = null;
         }
       });
       record.hls.loadSource(url);
       record.hls.attachMedia(record.video);
-    } else if (record.video.canPlayType("application/vnd.apple.mpegurl")) {
-      record.video.addEventListener(
-        "loadedmetadata",
-        () => scheduleLiveEdgeJoin(record),
-        { once: true }
-      );
-      record.video.src = url;
-      playRecord(record);
     } else {
       record.video.src = url;
       playRecord(record);
-    }
-  }
-
-  function hlsErrorDetail(data) {
-    if (!data) return "unknown";
-    const base = data.details || data.type || "fatal";
-    // Diagnostic: include the failed fetch's HTTP status + host so the sender can
-    // tell CORS (status 0/none — browser blocked the cross-origin response) from
-    // a real HTTP error like 403 (auth/geo). hls.js sets data.response for
-    // network errors; networkDetails is the raw XHR.
-    let status = null;
-    if (data.response && data.response.code != null) status = data.response.code;
-    else if (data.networkDetails && typeof data.networkDetails.status === "number") status = data.networkDetails.status;
-    const url = (data.context && data.context.url) || data.url || (data.frag && data.frag.url) || "";
-    const host = url ? (url.split("/")[2] || "") : "";
-    return base + " http=" + (status == null ? "none" : status) + (host ? " host=" + host : "");
-  }
-
-  function handleFatalHlsError(record, url, policy, data) {
-    // Guard against a teardown/replacement landing mid-error: only act if this
-    // record is still bound to the same url we started with.
-    if (record.url !== url) return;
-
-    // Tear down the broken hls instance before any retry/blank.
-    if (record.hls) {
-      record.hls.destroy();
-      record.hls = null;
-    }
-    if (record.retryTimer) {
-      window.clearTimeout(record.retryTimer);
-      record.retryTimer = null;
-    }
-
-    if (record.retryCount < TILE_RETRY_LIMIT) {
-      const backoff = TILE_RETRY_BACKOFF_MS[Math.min(record.retryCount, TILE_RETRY_BACKOFF_MS.length - 1)];
-      record.retryCount += 1;
-      record.didJoinLiveEdge = false;
-      record.retryTimer = window.setTimeout(() => {
-        record.retryTimer = null;
-        // The url may have been swapped out from under us while we waited.
-        if (record.url !== url) return;
-        startStream(record, url, policy);
-      }, backoff);
-      return;
-    }
-
-    // Retries exhausted: blank the tile and surface the failure to the sender.
-    record.element.dataset.error = "true";
-    record.url = null;
-    if (lastSenderId) {
-      send(lastSenderId, nowMessage("slotError", { slotId: record.id, reason: hlsErrorDetail(data) }));
     }
   }
 
@@ -559,14 +427,9 @@
     }
     record.url = url;
     record.element.dataset.error = "false";
-    record.retryCount = 0;
     if (record.attachTimer) {
       window.clearTimeout(record.attachTimer);
       record.attachTimer = null;
-    }
-    if (record.retryTimer) {
-      window.clearTimeout(record.retryTimer);
-      record.retryTimer = null;
     }
     if (record.liveEdgeTimer) {
       window.clearTimeout(record.liveEdgeTimer);
@@ -601,16 +464,10 @@
       throw new Error("Invalid multiview board.");
     }
 
-    // A new multiview session invalidates the rolling health judgement —
-    // tile set / layout changed, so prior frame/stall deltas no longer apply.
-    if (board.sessionId !== currentSessionId) {
-      resetHealthMonitor();
-    }
     currentSessionId = board.sessionId;
-    const slots = board.slots.filter((slot) => slot.id && slot.hlsUrl).slice(0, MAX_TILES);
+    const slots = board.slots.filter((slot) => slot.id && slot.hlsUrl).slice(0, 9);
     const layout = normalizeLayout(board.layout, slots.length);
-    const focusedIndex = slots.findIndex((slot) => slot.id === board.focusedSlotId);
-    const frames = layoutFrames(layout, slots.length, Math.max(0, focusedIndex));
+    const frames = layoutFrames(layout, slots.length);
     setMultiviewMode(slots.length, layout);
 
     const liveIds = new Set(slots.map((slot) => slot.id));
@@ -634,97 +491,6 @@
     }
   }
 
-  // --- Playback-health monitor ------------------------------------------------
-  // The receiver only RECOMMENDS a tile-count reduction; it never drops tiles
-  // itself. The sender owns the board: on a `capability`/`fallbackToSingle`
-  // message it decides whether to re-send a smaller board, and the receiver
-  // keeps rendering whatever board it is given.
-  let healthWindow = [];          // rolling array of per-sample aggregates
-  let lastDowngradeAt = 0;        // Date.now() of the last downgrade recommendation
-
-  function resetHealthMonitor() {
-    healthWindow = [];
-    lastDowngradeAt = 0;
-    for (const record of records.values()) {
-      record.stallCount = 0;
-      record.prevDropped = 0;
-      record.prevTotal = 0;
-    }
-  }
-
-  function liveRecords() {
-    const live = [];
-    for (const record of records.values()) {
-      if (record.url) live.push(record);
-    }
-    return live;
-  }
-
-  function sampleHealth() {
-    if (document.body.dataset.mode !== "multiview") return;
-
-    const live = liveRecords();
-    if (live.length < 2) return;
-
-    let droppedDelta = 0;
-    let totalDelta = 0;
-    let stallDelta = 0;
-    let measured = 0;
-
-    for (const record of live) {
-      // Not all Cast platforms implement getVideoPlaybackQuality — feature-detect
-      // and skip the frame stats gracefully if it's missing.
-      if (typeof record.video.getVideoPlaybackQuality === "function") {
-        const quality = record.video.getVideoPlaybackQuality();
-        const dropped = Number(quality.droppedVideoFrames || 0);
-        const total = Number(quality.totalVideoFrames || 0);
-        droppedDelta += Math.max(0, dropped - record.prevDropped);
-        totalDelta += Math.max(0, total - record.prevTotal);
-        record.prevDropped = dropped;
-        record.prevTotal = total;
-        measured += 1;
-      }
-      stallDelta += record.stallCount;
-      record.stallCount = 0;
-    }
-
-    healthWindow.push({ droppedDelta, totalDelta, stallDelta, tileCount: live.length, measured });
-    if (healthWindow.length > HEALTH_WINDOW_SAMPLES) healthWindow.shift();
-    if (healthWindow.length < HEALTH_WINDOW_SAMPLES) return;
-
-    let windowDropped = 0;
-    let windowTotal = 0;
-    let windowStalls = 0;
-    let maxTiles = 0;
-    let anyMeasured = false;
-    for (const sample of healthWindow) {
-      windowDropped += sample.droppedDelta;
-      windowTotal += sample.totalDelta;
-      windowStalls += sample.stallDelta;
-      maxTiles = Math.max(maxTiles, sample.tileCount);
-      if (sample.measured > 0) anyMeasured = true;
-    }
-
-    const droppedRatio = anyMeasured && windowTotal > 0 ? windowDropped / windowTotal : 0;
-    const stallOverload = windowStalls > maxTiles * HEALTH_STALL_PER_TILE;
-    const frameOverload = droppedRatio > HEALTH_DROPPED_FRAME_RATIO;
-    if (!stallOverload && !frameOverload) return;
-
-    const now = Date.now();
-    if (now - lastDowngradeAt < HEALTH_DOWNGRADE_COOLDOWN_MS) return;
-    lastDowngradeAt = now;
-    // Clear the window so we re-accumulate a fresh judgement after the step-down.
-    healthWindow = [];
-
-    if (!lastSenderId) return;
-    const reason = "dropped_frames";
-    if (maxTiles > 2) {
-      send(lastSenderId, nowMessage("capability", { recommendedMaxTiles: 2, reason }));
-    } else {
-      send(lastSenderId, nowMessage("fallbackToSingle", { reason }));
-    }
-  }
-
   function isStaleEnvelope(envelope) {
     if (!envelope || typeof envelope.sequence !== "number") return false;
     if (currentSessionId && envelope.sessionId === currentSessionId && envelope.sequence < latestSequence) {
@@ -736,7 +502,6 @@
 
   function handleEnvelope(event) {
     const senderId = event.senderId;
-    if (senderId) lastSenderId = senderId;
     try {
       const envelope = parseData(event.data);
       if (!envelope || envelope.schemaVersion !== 1) {
@@ -780,26 +545,7 @@
 
   context.addCustomMessageListener(NAMESPACE, handleEnvelope);
   context.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, (event) => {
-    if (event.senderId) {
-      connectedSenders.add(event.senderId);
-      lastSenderId = event.senderId;
-    }
     send(event.senderId, nowMessage("ready", { sessionId: currentSessionId }));
   });
-  context.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, (event) => {
-    if (event.senderId) connectedSenders.delete(event.senderId);
-    if (lastSenderId === event.senderId) lastSenderId = null;
-    // Idle timeout is disabled (multiview owns playback outside CAF's media
-    // session), so the last sender leaving won't auto-tear-down. Do it
-    // explicitly to avoid stranded decoders / orphaned video elements.
-    if (connectedSenders.size === 0) {
-      setIdle();
-    }
-  });
-
-  // One health sampler for the lifetime of the receiver; it no-ops unless we're
-  // in multiview mode with >=2 live tiles (see sampleHealth).
-  window.setInterval(sampleHealth, HEALTH_SAMPLE_INTERVAL_MS);
-
   context.start({ disableIdleTimeout: true });
 })();

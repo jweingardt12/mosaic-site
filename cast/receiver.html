@@ -4,9 +4,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Mosaic Multiview Receiver</title>
-    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-    <link rel="dns-prefetch" href="https://www.gstatic.com">
-    <!-- TODO: preconnect to the MLB segment CDN host once confirmed via Chrome Remote Debugger network panel on a real stream, e.g. <link rel="preconnect" href="https://<mlb-cdn-host>" crossorigin> -->
     <link rel="stylesheet" href="./receiver.css">
   </head>
   <body>
@@ -19,7 +16,7 @@
       <section id="slot-grid" class="slot-grid" aria-label="Mosaic multiview"></section>
     </main>
     <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
-    <script src="./hls.min.js"></script>
-    <script src="./receiver.js?v=diag1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js"></script>
+    <script src="./receiver.js?v=ab-yday"></script>
   </body>
 </html>
