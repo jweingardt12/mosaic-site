@@ -8,9 +8,10 @@
   const LAYOUTS = new Set(["auto", "grid", "heroLeft", "heroTop", "quad", "sideBySide", "stacked", "spotlight"]);
   const GAP = 0.012;
   const ATTACH_STAGGER_MS = 1200;
-  const LIVE_EDGE_OFFSET_SECONDS = 3;
-  const LIVE_EDGE_JOIN_ATTEMPTS = 8;
-  const LIVE_EDGE_JOIN_RETRY_MS = 500;
+  const LIVE_EDGE_OFFSET_SECONDS = 3;        // sit this far behind the live edge
+  const LIVE_EDGE_MAX_DRIFT_SECONDS = 8;     // >this far behind the playlist end → jump to live
+  const LIVE_EDGE_PIN_MS = 1000;             // re-check cadence
+  const LIVE_EDGE_PIN_DURATION_MS = 30000;   // actively pull a tile up to live for this long
   const FOCUSED_MAX_HEIGHT = 540;
   const FOCUSED_MAX_BITRATE = 2200000;
   const FOUR_UP_FOCUSED_MAX_HEIGHT = 360;
@@ -253,7 +254,7 @@
       record.hls = null;
     }
     if (record.liveEdgeTimer) {
-      window.clearTimeout(record.liveEdgeTimer);
+      window.clearInterval(record.liveEdgeTimer);
       record.liveEdgeTimer = null;
     }
     record.video.pause();
@@ -284,7 +285,16 @@
     error.className = "slot-error";
     error.textContent = "Unable to play this stream";
 
-    element.append(video, error);
+    // TEMP diagnostic readout: shows the native player's seekable range,
+    // duration, and current position so we can see why a tile starts behind
+    // live on-device. Remove once live-edge join is confirmed.
+    const debug = document.createElement("div");
+    debug.className = "slot-debug";
+    debug.style.cssText =
+      "position:absolute;top:4px;left:6px;z-index:9;font:10px/1.3 ui-monospace,monospace;" +
+      "color:#5f5;background:rgba(0,0,0,.55);padding:1px 5px;border-radius:3px;pointer-events:none;";
+
+    element.append(video, error, debug);
     grid.append(element);
 
     const record = {
@@ -292,6 +302,7 @@
       element,
       video,
       error,
+      debug,
       hls: null,
       url: null,
       attachTimer: null,
@@ -393,55 +404,65 @@
     }
   }
 
-  function seekToLiveEdge(record) {
+  function liveEdgeRange(record) {
     const ranges = record.video.seekable;
-    if (!ranges || ranges.length <= 0) return false;
+    if (!ranges || ranges.length <= 0) return null;
     const index = ranges.length - 1;
     const start = ranges.start(index);
     const end = ranges.end(index);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return false;
-
-    const target = Math.max(start, end - LIVE_EDGE_OFFSET_SECONDS);
-    if (!Number.isFinite(target)) return false;
-    // Treat the tile as joined only once playback is ACTUALLY at the live edge.
-    // The native Cast player can silently ignore a currentTime set issued right
-    // after loadedmetadata and stay at 0; if we marked it joined on the first
-    // valid seekable range we'd stop retrying and the tile would play from the
-    // start of the DVR window. Keep retrying (scheduleLiveEdgeJoin) until the
-    // seek has landed.
-    if (record.video.currentTime >= target - 1.5) return true;
-    record.video.currentTime = target;
-    return false;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+    return { start, end };
   }
 
-  function scheduleLiveEdgeJoin(record, attempts = LIVE_EDGE_JOIN_ATTEMPTS) {
-    if (record.didJoinLiveEdge) return;
-    if (record.liveEdgeTimer) {
-      window.clearTimeout(record.liveEdgeTimer);
-      record.liveEdgeTimer = null;
-    }
+  function updateDebug(record, range) {
+    if (!record.debug) return;
+    const v = record.video;
+    const dur = Number.isFinite(v.duration) ? v.duration.toFixed(0) : String(v.duration);
+    record.debug.textContent = range
+      ? "sk:" + range.start.toFixed(0) + "-" + range.end.toFixed(0) +
+        " d:" + dur + " c:" + v.currentTime.toFixed(0)
+      : "sk:none d:" + dur + " c:" + v.currentTime.toFixed(0);
+  }
 
+  // Pull a tile up to the live edge and keep it there. The old one-shot
+  // approach gave up after the first valid seekable range, but on the native
+  // Cast player `seekable.end` only reaches the true live point a few seconds
+  // after playback starts (and an early currentTime set can be ignored). So we
+  // poll: while within the enforce window, whenever a tile is more than
+  // MAX_DRIFT behind the playlist end, jump it to (end - OFFSET). The interval
+  // also drives the on-tile debug readout for the life of the tile.
+  function startLiveEdgePin(record) {
+    stopLiveEdgePin(record);
     const url = record.url;
-    const attempt = (remaining) => {
-      if (record.url !== url) return;
-      if (seekToLiveEdge(record)) {
-        record.didJoinLiveEdge = true;
+    const startedAt = Date.now();
+    const tick = () => {
+      if (record.url !== url) {
+        stopLiveEdgePin(record);
         return;
       }
-      if (remaining <= 1) return;
-      record.liveEdgeTimer = window.setTimeout(() => {
-        record.liveEdgeTimer = null;
-        attempt(remaining - 1);
-      }, LIVE_EDGE_JOIN_RETRY_MS);
+      const range = liveEdgeRange(record);
+      updateDebug(record, range);
+      if (range && Date.now() - startedAt <= LIVE_EDGE_PIN_DURATION_MS) {
+        if (range.end - record.video.currentTime > LIVE_EDGE_MAX_DRIFT_SECONDS) {
+          record.video.currentTime = Math.max(range.start, range.end - LIVE_EDGE_OFFSET_SECONDS);
+        }
+      }
     };
+    tick();
+    record.liveEdgeTimer = window.setInterval(tick, LIVE_EDGE_PIN_MS);
+  }
 
-    attempt(attempts);
+  function stopLiveEdgePin(record) {
+    if (record.liveEdgeTimer) {
+      window.clearInterval(record.liveEdgeTimer);
+      record.liveEdgeTimer = null;
+    }
   }
 
   function playRecord(record) {
-    scheduleLiveEdgeJoin(record);
+    startLiveEdgePin(record);
     record.video.play()
-      .then(() => scheduleLiveEdgeJoin(record, 3))
+      .then(() => startLiveEdgePin(record))
       .catch(() => {
         record.element.dataset.error = "true";
       });
@@ -462,7 +483,7 @@
     if (record.video.canPlayType("application/vnd.apple.mpegurl")) {
       record.video.addEventListener(
         "loadedmetadata",
-        () => scheduleLiveEdgeJoin(record),
+        () => startLiveEdgePin(record),
         { once: true }
       );
       record.video.src = url;
@@ -490,11 +511,11 @@
       });
       record.hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
         applyQualityPolicy(record, policy);
-        scheduleLiveEdgeJoin(record);
+        startLiveEdgePin(record);
         playRecord(record);
       });
       record.hls.on(window.Hls.Events.LEVEL_LOADED, () => {
-        scheduleLiveEdgeJoin(record, 4);
+        startLiveEdgePin(record);
       });
       record.hls.on(window.Hls.Events.ERROR, (_event, data) => {
         if (data && data.fatal) {
@@ -579,7 +600,7 @@
       record.retryTimer = null;
     }
     if (record.liveEdgeTimer) {
-      window.clearTimeout(record.liveEdgeTimer);
+      window.clearInterval(record.liveEdgeTimer);
       record.liveEdgeTimer = null;
     }
     if (record.hls) {
