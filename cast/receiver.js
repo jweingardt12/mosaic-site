@@ -5,7 +5,7 @@
   const shell = document.getElementById("multiview");
   const grid = document.getElementById("slot-grid");
   const records = new Map();
-  const LAYOUTS = new Set(["auto", "grid", "heroLeft", "heroTop", "quad"]);
+  const LAYOUTS = new Set(["auto", "grid", "heroLeft", "heroTop", "quad", "sideBySide", "stacked", "spotlight"]);
   const GAP = 0.012;
   const ATTACH_STAGGER_MS = 1200;
   const LIVE_EDGE_OFFSET_SECONDS = 3;
@@ -89,6 +89,7 @@
     const value = typeof layout === "string" && LAYOUTS.has(layout) ? layout : "auto";
     if (value === "quad" && count > 4) return "grid";
     if ((value === "heroLeft" || value === "heroTop") && count < 2) return "auto";
+    if ((value === "stacked" || value === "spotlight") && count < 2) return "sideBySide";
     return value;
   }
 
@@ -192,7 +193,24 @@
     return equalGridFrames(count, 3, 3);
   }
 
-  function layoutFrames(layout, count) {
+  function spotlightFrames(count, focusedIndex) {
+    // 2-tile spotlight: the focused (audio) game fills the big left frame; the
+    // other is a smaller card on the right. Switching audio swaps them.
+    if (count <= 1) return [rect(0, 0, 1, 1)];
+    if (count !== 2) return equalGridFrames(count, 2, 1);
+    const bigWidth = 0.68;
+    const big = rect(0, 0, bigWidth, 1);
+    const smallWidth = 1 - bigWidth - GAP;
+    const smallHeight = 0.5;
+    const small = rect(bigWidth + GAP, (1 - smallHeight) / 2, smallWidth, smallHeight);
+    const focused = Math.max(0, Math.min(Number(focusedIndex) || 0, 1));
+    const frames = [];
+    frames[focused] = big;
+    frames[1 - focused] = small;
+    return frames;
+  }
+
+  function layoutFrames(layout, count, focusedIndex) {
     switch (normalizeLayout(layout, count)) {
       case "grid":
         return gridFrames(count);
@@ -202,6 +220,12 @@
         return heroTopFrames(count);
       case "quad":
         return equalGridFrames(count, 2, 2);
+      case "sideBySide":
+        return count <= 1 ? [rect(0, 0, 1, 1)] : equalGridFrames(count, 2, 1);
+      case "stacked":
+        return count <= 1 ? [rect(0, 0, 1, 1)] : equalGridFrames(count, 1, 2);
+      case "spotlight":
+        return spotlightFrames(count, focusedIndex);
       case "auto":
       default:
         return autoFrames(count);
@@ -575,7 +599,8 @@
     currentSessionId = board.sessionId;
     const slots = board.slots.filter((slot) => slot.id && slot.hlsUrl).slice(0, MAX_TILES);
     const layout = normalizeLayout(board.layout, slots.length);
-    const frames = layoutFrames(layout, slots.length);
+    const focusedIndex = slots.findIndex((slot) => slot.id === board.focusedSlotId);
+    const frames = layoutFrames(layout, slots.length, Math.max(0, focusedIndex));
     setMultiviewMode(slots.length, layout);
 
     const liveIds = new Set(slots.map((slot) => slot.id));
