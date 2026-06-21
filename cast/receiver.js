@@ -7,17 +7,20 @@
   const records = new Map();
   const LAYOUTS = new Set(["auto", "grid", "heroLeft", "heroTop", "quad"]);
   const GAP = 0.012;
-  const ATTACH_STAGGER_MS = 900;
-  const FOCUSED_MAX_HEIGHT = 720;
-  const FOCUSED_MAX_BITRATE = 3600000;
+  const ATTACH_STAGGER_MS = 1200;
+  const LIVE_EDGE_OFFSET_SECONDS = 3;
+  const LIVE_EDGE_JOIN_ATTEMPTS = 8;
+  const LIVE_EDGE_JOIN_RETRY_MS = 500;
+  const FOCUSED_MAX_HEIGHT = 540;
+  const FOCUSED_MAX_BITRATE = 2200000;
   const FOUR_UP_FOCUSED_MAX_HEIGHT = 360;
-  const FOUR_UP_FOCUSED_MAX_BITRATE = 1400000;
-  const SECONDARY_MAX_HEIGHT = 360;
-  const SECONDARY_MAX_BITRATE = 1000000;
-  const FOUR_UP_SECONDARY_MAX_HEIGHT = 234;
-  const FOUR_UP_SECONDARY_MAX_BITRATE = 500000;
-  const DENSE_SECONDARY_MAX_HEIGHT = 234;
-  const DENSE_SECONDARY_MAX_BITRATE = 420000;
+  const FOUR_UP_FOCUSED_MAX_BITRATE = 900000;
+  const SECONDARY_MAX_HEIGHT = 270;
+  const SECONDARY_MAX_BITRATE = 550000;
+  const FOUR_UP_SECONDARY_MAX_HEIGHT = 180;
+  const FOUR_UP_SECONDARY_MAX_BITRATE = 280000;
+  const DENSE_SECONDARY_MAX_HEIGHT = 180;
+  const DENSE_SECONDARY_MAX_BITRATE = 220000;
   let currentSessionId = null;
   let latestSequence = 0;
   document.body.dataset.mode = "idle";
@@ -203,10 +206,15 @@
       record.hls.destroy();
       record.hls = null;
     }
+    if (record.liveEdgeTimer) {
+      window.clearTimeout(record.liveEdgeTimer);
+      record.liveEdgeTimer = null;
+    }
     record.video.pause();
     record.video.removeAttribute("src");
     record.video.load();
     record.url = null;
+    record.didJoinLiveEdge = false;
     record.policyKey = null;
   }
 
@@ -237,13 +245,15 @@
       hls: null,
       url: null,
       attachTimer: null,
+      liveEdgeTimer: null,
+      didJoinLiveEdge: false,
       policyKey: null,
     };
   }
 
   function qualityPolicy(slot, board, frame, index, count) {
     const focused = slot.id === board.focusedSlotId;
-    const dense = count >= 7;
+    const dense = count >= 5;
     const fourUp = count >= 4;
     const relaxed = count <= 2;
     const maxHeight = focused
@@ -308,10 +318,52 @@
     }
   }
 
+  function seekToLiveEdge(record) {
+    const ranges = record.video.seekable;
+    if (!ranges || ranges.length <= 0) return false;
+    const index = ranges.length - 1;
+    const start = ranges.start(index);
+    const end = ranges.end(index);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return false;
+
+    const target = Math.max(start, end - LIVE_EDGE_OFFSET_SECONDS);
+    if (Number.isFinite(target) && Math.abs(record.video.currentTime - target) > 1.5) {
+      record.video.currentTime = target;
+    }
+    return true;
+  }
+
+  function scheduleLiveEdgeJoin(record, attempts = LIVE_EDGE_JOIN_ATTEMPTS) {
+    if (record.didJoinLiveEdge) return;
+    if (record.liveEdgeTimer) {
+      window.clearTimeout(record.liveEdgeTimer);
+      record.liveEdgeTimer = null;
+    }
+
+    const url = record.url;
+    const attempt = (remaining) => {
+      if (record.url !== url) return;
+      if (seekToLiveEdge(record)) {
+        record.didJoinLiveEdge = true;
+        return;
+      }
+      if (remaining <= 1) return;
+      record.liveEdgeTimer = window.setTimeout(() => {
+        record.liveEdgeTimer = null;
+        attempt(remaining - 1);
+      }, LIVE_EDGE_JOIN_RETRY_MS);
+    };
+
+    attempt(attempts);
+  }
+
   function playRecord(record) {
-    record.video.play().catch(() => {
-      record.element.dataset.error = "true";
-    });
+    scheduleLiveEdgeJoin(record);
+    record.video.play()
+      .then(() => scheduleLiveEdgeJoin(record, 3))
+      .catch(() => {
+        record.element.dataset.error = "true";
+      });
   }
 
   function startStream(record, url, policy) {
@@ -319,26 +371,36 @@
     record.element.dataset.error = "false";
 
     if (record.video.canPlayType("application/vnd.apple.mpegurl")) {
+      record.video.addEventListener(
+        "loadedmetadata",
+        () => scheduleLiveEdgeJoin(record),
+        { once: true }
+      );
       record.video.src = url;
       playRecord(record);
     } else if (window.Hls && window.Hls.isSupported()) {
       record.hls = new window.Hls({
-        liveSyncDurationCount: policy.focused ? 5 : 6,
+        liveSyncDurationCount: policy.focused ? 3 : 4,
         maxLiveSyncPlaybackRate: 1,
         capLevelToPlayerSize: true,
         lowLatencyMode: false,
         enableWorker: true,
         startLevel: 0,
-        maxBufferLength: policy.focused ? 12 : 7,
-        maxMaxBufferLength: policy.focused ? 16 : 10,
-        maxBufferSize: policy.focused ? 14000000 : 7000000,
+        startPosition: -1,
+        maxBufferLength: policy.focused ? 8 : 4,
+        maxMaxBufferLength: policy.focused ? 10 : 6,
+        maxBufferSize: policy.focused ? 9000000 : 3500000,
         backBufferLength: 0,
         abrEwmaFastLive: 2,
         abrEwmaSlowLive: 5,
       });
       record.hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
         applyQualityPolicy(record, policy);
+        scheduleLiveEdgeJoin(record);
         playRecord(record);
+      });
+      record.hls.on(window.Hls.Events.LEVEL_LOADED, () => {
+        scheduleLiveEdgeJoin(record, 4);
       });
       record.hls.on(window.Hls.Events.ERROR, (_event, data) => {
         if (data && data.fatal) {
@@ -369,6 +431,10 @@
       window.clearTimeout(record.attachTimer);
       record.attachTimer = null;
     }
+    if (record.liveEdgeTimer) {
+      window.clearTimeout(record.liveEdgeTimer);
+      record.liveEdgeTimer = null;
+    }
     if (record.hls) {
       record.hls.destroy();
       record.hls = null;
@@ -376,6 +442,7 @@
     record.video.pause();
     record.video.removeAttribute("src");
     record.video.load();
+    record.didJoinLiveEdge = false;
     record.policyKey = policy.key;
 
     record.attachTimer = window.setTimeout(() => {
