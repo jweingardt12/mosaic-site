@@ -466,12 +466,20 @@
     }
   }
 
-  function playRecord(record) {
+  function playRecord(record, url, policy) {
     startLiveEdgePin(record);
     record.video.play()
       .then(() => startLiveEdgePin(record))
-      .catch(() => {
-        record.element.dataset.error = "true";
+      .catch((err) => {
+        // play() rejects on a genuine load failure AND on a transient
+        // interruption (AbortError: the src/load was swapped before play()
+        // resolved). The latter self-heals — ignore it. For a real rejection,
+        // retry before failing: the native path otherwise had NO retry, so one
+        // slow-starting feed (e.g. MLB Network linear) tripped a permanent
+        // "Unable to play this stream" on the first hiccup, even though the
+        // feed plays fine locally.
+        if (err && err.name === "AbortError") return;
+        handleNativeError(record, url, policy, err && err.name ? err.name : "play-rejected");
       });
   }
 
@@ -494,7 +502,7 @@
         { once: true }
       );
       record.video.src = url;
-      playRecord(record);
+      playRecord(record, url, policy);
     } else if (window.Hls && window.Hls.isSupported()) {
       record.hls = new window.Hls({
         // Sit further behind live and tolerate a tile drifting back, so a
@@ -519,7 +527,7 @@
       record.hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
         applyQualityPolicy(record, policy);
         startLiveEdgePin(record);
-        playRecord(record);
+        playRecord(record, url, policy);
       });
       record.hls.on(window.Hls.Events.LEVEL_LOADED, () => {
         startLiveEdgePin(record);
@@ -533,7 +541,7 @@
       record.hls.attachMedia(record.video);
     } else {
       record.video.src = url;
-      playRecord(record);
+      playRecord(record, url, policy);
     }
   }
 
@@ -585,6 +593,50 @@
     record.url = null;
     if (lastSenderId) {
       send(lastSenderId, nowMessage("slotError", { slotId: record.id, reason: hlsErrorDetail(data) }));
+    }
+  }
+
+  // Native (<video>) counterpart to handleFatalHlsError. The native path had no
+  // retry at all, so a single failed/aborted play() permanently failed the tile
+  // — fatal for a slow-starting feed like MLB Network linear, which plays fine
+  // once it actually gets going.
+  function handleNativeError(record, url, policy, reason) {
+    // Guard against a teardown/replacement landing mid-error: the url moved on.
+    if (record.url !== url) return;
+    if (record.hls) {
+      record.hls.destroy();
+      record.hls = null;
+    }
+    if (record.retryTimer) {
+      window.clearTimeout(record.retryTimer);
+      record.retryTimer = null;
+    }
+
+    if (record.retryCount < TILE_RETRY_LIMIT) {
+      const backoff = TILE_RETRY_BACKOFF_MS[Math.min(record.retryCount, TILE_RETRY_BACKOFF_MS.length - 1)];
+      record.retryCount += 1;
+      record.didJoinLiveEdge = false;
+      record.retryTimer = window.setTimeout(() => {
+        record.retryTimer = null;
+        // The url may have been swapped out from under us while we waited.
+        if (record.url !== url) return;
+        // Reset the element first — a stalled/aborted native load won't recover
+        // on its own; re-`src` after a clean load() does.
+        try {
+          record.video.pause();
+          record.video.removeAttribute("src");
+          record.video.load();
+        } catch (e) {}
+        startStream(record, url, policy);
+      }, backoff);
+      return;
+    }
+
+    // Retries exhausted: blank the tile and surface the failure to the sender.
+    record.element.dataset.error = "true";
+    record.url = null;
+    if (lastSenderId) {
+      send(lastSenderId, nowMessage("slotError", { slotId: record.id, reason: "native:" + (reason || "play-failed") }));
     }
   }
 
