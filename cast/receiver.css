@@ -112,9 +112,17 @@ body[data-mode="single"] .receiver-shell {
 }
 
 /* A lone tile (single-game cast) is always "focused" and fills the screen, so
-   a border is just noise — drop it entirely. */
+   a border is just noise — drop it entirely. It should also reach the TV's
+   edges: remove the multiview grid inset and the tile's rounded corners so the
+   video is truly full-screen (no black bars). The 16:9 aspect-fit in
+   applyFrame is skipped for the lone full-frame tile too. */
 .receiver-shell[data-count="1"] .slot {
   border-color: transparent;
+  border-radius: 0;
+}
+
+.receiver-shell[data-count="1"] .slot-grid {
+  inset: 0;
 }
 
 .slot video {

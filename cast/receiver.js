@@ -240,10 +240,16 @@
     // otherwise leaves black inside the border on non-16:9 cells (e.g. 2-up).
     // The video doesn't shrink (it was already letterboxed to 16:9); only the
     // tile/border moves inward to meet it.
+    //
+    // Skip this for the lone full-frame tile (single-game cast): it has no
+    // border to hug and should fill the whole screen. Aspect-fitting it would
+    // pull the tile inward and reintroduce black bars; object-fit:contain on the
+    // video already handles a non-16:9 screen correctly.
     const grid = element.parentElement;
     const gw = grid ? grid.clientWidth : 0;
     const gh = grid ? grid.clientHeight : 0;
-    if (gw > 0 && gh > 0) {
+    const isFullFrame = width === 1 && height === 1;
+    if (gw > 0 && gh > 0 && !isFullFrame) {
       const cellW = width * gw;
       const cellH = height * gh;
       let fitW = cellW;
