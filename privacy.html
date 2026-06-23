@@ -19,37 +19,84 @@
 <p class="nav"><a href="./index.html">Home</a> | <a href="./how-to.html">Comprehensive How-To</a> | <a href="./about.html">Quick Guide</a></p>
 
 <h1>Mosaic Privacy Policy</h1>
-<p class="meta">Last updated: April 13, 2026</p>
+<p class="meta">Last updated: June 23, 2026</p>
 
-<p>Mosaic (&ldquo;the App&rdquo;) is an MLB companion app published by Jason Weingardt (&ldquo;we&rdquo;, &ldquo;us&rdquo;). This Privacy Policy explains what data the App collects, how it is used, and your rights.</p>
+<p>Mosaic (&ldquo;the App&rdquo;) is an MLB companion app published by Jason Weingardt (&ldquo;we&rdquo;, &ldquo;us&rdquo;). This Privacy Policy explains what data the App collects, how it is used, who it is shared with, and your rights. Mosaic is distributed only through Apple&rsquo;s TestFlight beta program.</p>
 
-<h2>What we collect</h2>
-<p><strong>Email address and password (MLB.tv credentials).</strong> When you log in to MLB.tv through the App, your email and password are stored on your device in the iOS Keychain. These credentials are used only to authenticate against MLB&rsquo;s servers on your behalf. They are never transmitted to, or stored on, any server operated by us.</p>
-<p><strong>Preferences.</strong> The App stores your favorite team, tab customization, and other UI preferences locally on your device using iOS <code>UserDefaults</code>. This data never leaves your device.</p>
+<p>Our guiding principle is to keep your personal data on your device wherever possible. We do not sell your data, we do not use it for advertising, and we do not track you across other apps or websites.</p>
 
-<h2>What we do NOT collect</h2>
+<h2>Data stored only on your device</h2>
 <ul>
-  <li>No tracking identifiers, advertising IDs, or device fingerprints.</li>
-  <li>No third-party analytics, advertising, or social-media SDKs.</li>
-  <li>No data is shared with third parties for advertising or marketing.</li>
-  <li>No cross-app or cross-website tracking.</li>
+  <li><strong>MLB.tv credentials.</strong> When you sign in to MLB.tv, your email and password are stored in the iOS Keychain on your device (and synced across your own Apple devices via iCloud Keychain, like a saved Safari password). Your password is used only to authenticate to MLB on your behalf and is never transmitted to, or stored on, any server operated by us. (Your email address may be included as a contact address if you choose to submit in-app feedback — see &ldquo;In-app feedback and support&rdquo; below.)</li>
+  <li><strong>Yahoo Fantasy tokens.</strong> If you connect a Yahoo Fantasy account, the resulting access/refresh tokens are stored in your device Keychain. We never receive or store your Yahoo password.</li>
+  <li><strong>AI provider keys.</strong> If you choose to connect a third-party cloud AI provider, the API key or sign-in you provide is stored in your device Keychain.</li>
+  <li><strong>Preferences.</strong> Your favorite team, followed players, tab customization, and other settings are stored on your device (and may sync across your devices via iCloud). Followed-team and followed-player selections are also sent to our notification backend if you enable alerts (see below).</li>
 </ul>
+
+<h2>Analytics and diagnostics</h2>
+<p>Mosaic uses <a href="https://posthog.com/privacy">PostHog</a> for product analytics, performance tracing, and crash and error diagnostics, to understand how the App is used and to fix problems. This data is associated with a random, app-generated identifier (an &ldquo;install ID&rdquo;), not with your name. We do <strong>not</strong> use advertising identifiers (no IDFA), device fingerprinting, or any advertising or cross-app tracking.</p>
+<ul>
+  <li>Events include things like which screens you open, feature usage, app version, device model and OS version, locale, and crash and performance metrics (the latter via Apple&rsquo;s MetricKit).</li>
+  <li><strong>Session replay</strong> is off by default. It is captured only around a feedback report you submit, and is configured to mask all text input and images before it leaves your device.</li>
+  <li>You can turn analytics off at any time in the App&rsquo;s Settings.</li>
+</ul>
+
+<h2>Push notifications and Live Activities</h2>
+<p>If you enable notifications, Live Activities, or widgets, we register an anonymous device push token (and your selected team/player IDs) with our backend, hosted on <a href="https://supabase.com/privacy">Supabase</a>, so we can deliver game and player alerts and keep Live Activities and widgets up to date. These records are keyed to opaque push tokens and a random install ID — not to your name, email, or MLB.tv account.</p>
+
+<h2>In-app feedback and support</h2>
+<p>If you submit feedback or a bug report (in the App, or via TestFlight&rsquo;s feedback feature), we collect: your message; a diagnostic snapshot of your device and app state (e.g. device model, OS and app version, locale, network status, battery and storage status); recent in-app error logs; any screenshots or screen recordings you choose to attach; and your MLB.tv email address as a contact so we can follow up. This information is used solely to triage and respond to your report. It is processed and stored using <a href="https://supabase.com/privacy">Supabase</a> (attachment storage), <a href="https://linear.app/privacy">Linear</a> (our issue-tracking system), and <a href="https://posthog.com/privacy">PostHog</a>, and through Apple&rsquo;s App Store Connect when submitted via TestFlight.</p>
+
+<h2>Fantasy (Yahoo) integration</h2>
+<p>If you connect Yahoo Fantasy, the sign-in is completed through a small proxy service we operate (hosted on <a href="https://vercel.com/legal/privacy-policy">Vercel</a>) that exchanges authorization codes for access tokens with Yahoo. The proxy passes these tokens through to your device and does not store them. Your fantasy data is then retrieved by the App directly from Yahoo using your token; Yahoo&rsquo;s handling of your data is governed by Yahoo&rsquo;s own privacy policy.</p>
+
+<h2>AI features</h2>
+<p>By default, Mosaic&rsquo;s AI features (such as game briefings, summaries, and recaps) run entirely on your device using Apple&rsquo;s on-device <em>Foundation Models</em> framework. No prompt or output is transmitted to external servers by us. Optionally, you may connect your own third-party cloud AI provider (for example OpenAI, Anthropic, OpenRouter, or Ollama). If you do, the relevant request content is sent to that provider under your own account or API key, subject to that provider&rsquo;s privacy policy.</p>
+
+<h2>Other on-device features</h2>
+<ul>
+  <li><strong>Weather.</strong> Ballpark weather is provided by Apple WeatherKit.</li>
+  <li><strong>Multiview gaze focus.</strong> The optional &ldquo;gaze&rdquo; feature in multiview uses Apple&rsquo;s on-device face/eye-tracking (ARKit) to move audio to the game you&rsquo;re looking at. This face data is processed entirely on your device and never leaves it or is transmitted to us.</li>
+</ul>
+
+<h2>Optional event sign-ups</h2>
+<p>From time to time the App may offer an optional, explicitly opt-in sign-up (for example, a community watch-party). If you choose to participate, we collect the email address you provide for that specific purpose only.</p>
 
 <h2>Data you send to MLB</h2>
-<p>When you log in to MLB.tv through the App, your credentials and streaming-session requests go directly from your device to MLB Advanced Media&rsquo;s servers. Their handling of that data is governed by <a href="https://www.mlb.com/official-information/privacy-policy">MLB&rsquo;s privacy policy</a>. We do not mediate, inspect, or store this traffic beyond what the iOS Keychain stores locally on your device.</p>
+<p>When you sign in to MLB.tv and play video, your credentials and streaming-session requests go from your device to MLB Advanced Media&rsquo;s servers. Their handling of that data is governed by <a href="https://www.mlb.com/official-information/privacy-policy">MLB&rsquo;s privacy policy</a>. We do not store this traffic beyond what the iOS Keychain stores locally on your device.</p>
 
-<h2>On-device AI</h2>
-<p>Mosaic uses Apple&rsquo;s on-device <em>Foundation Models</em> framework to generate game recaps on supported devices. These AI-generated recaps are processed entirely on your device. No prompt or output is transmitted to external servers by us.</p>
-
-<h2>Data retention and deletion</h2>
-<p>All personal data (your MLB.tv credentials and preferences) lives on your device only. To delete it:</p>
+<h2>Third-party services we use</h2>
+<p>We use the following service providers to operate the App. They process data only to provide their service to us, not for their own advertising:</p>
 <ul>
-  <li>Log out of MLB.tv in the App&rsquo;s Settings &mdash; this removes credentials from the Keychain.</li>
-  <li>Delete the App from your device &mdash; this removes all local data.</li>
+  <li><strong>PostHog</strong> — analytics, diagnostics, and crash reporting.</li>
+  <li><strong>Supabase</strong> — backend database, notification delivery, and feedback-attachment storage.</li>
+  <li><strong>Vercel</strong> — hosts our feedback relay and Yahoo sign-in proxy.</li>
+  <li><strong>Linear</strong> — support and bug-tracking system for feedback you submit.</li>
+  <li><strong>Apple</strong> — push notifications (APNs), TestFlight distribution and beta feedback, WeatherKit, and iCloud.</li>
+  <li><strong>Yahoo</strong> — fantasy data, only if you connect a Yahoo account.</li>
+  <li><strong>Google</strong> — Cast/Chromecast streaming, only if you cast to a device.</li>
+  <li><strong>Your chosen AI provider</strong> — only if you opt in to cloud AI with your own account.</li>
 </ul>
 
+<h2>What we do NOT do</h2>
+<ul>
+  <li>We do not use advertising identifiers (IDFA), device fingerprinting, or any advertising SDKs.</li>
+  <li>We do not track you across other apps or websites.</li>
+  <li>We do not sell or rent your personal data, and we do not share it for advertising or marketing.</li>
+  <li>We do not run in-app purchases or collect payment information.</li>
+</ul>
+
+<h2>Data retention and deletion</h2>
+<p>Most of your data lives only on your device. To remove it:</p>
+<ul>
+  <li>Log out of MLB.tv (and disconnect Yahoo) in Settings — this removes those credentials/tokens from the Keychain.</li>
+  <li>Turn off notifications, or delete the App — deleting the App removes all local data and lets the associated push tokens expire on our backend.</li>
+  <li>Turn off analytics in Settings to stop further analytics collection.</li>
+</ul>
+<p>The limited data we hold off-device — analytics keyed to a random install ID, anonymous push tokens, feedback tickets and their attachments, and any optional event sign-up email — can be deleted on request. Email us and we will remove it.</p>
+
 <h2>Your rights</h2>
-<p>Because we do not collect personal data on our servers, there is no account on our side to delete and no server-side data for us to export or correct. For any question about this policy, contact <a href="mailto:jasonw@duck.com">jasonw@duck.com</a>.</p>
+<p>You may ask us what off-device data we hold that is associated with your install or feedback, and request that we delete or correct it. Because most data stays on your device and our server-side records are tied to anonymous identifiers, there is no user account on our side. For any request or question about this policy, contact <a href="mailto:jasonw@duck.com">jasonw@duck.com</a>.</p>
 
 <h2>Children&rsquo;s privacy</h2>
 <p>The App is not directed to children under 13 and does not knowingly collect data from them.</p>
